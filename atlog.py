@@ -12,73 +12,54 @@ PORT = "/dev/ttyUSB2"
 BAUDRATE = 115200
 LOG_FILE = f"lte_log_{v}_{h}.txt"
 
-def send_at_command(ser, command, timeout=2):
-    ser.write((command + "\r").encode())
-    time.sleep(timeout)
-    return ser.read_all().decode(errors='ignore')
+def send_qeng_command(ser):
+    ser.reset_input_buffer()
+    ser.write(b'AT+QENG="servingcell"\r')
+    time.sleep(DELAY)
 
-def parse_csq(response):
-    match = re.search(r'\+CSQ: (\d+),(\d+)', response)
-    if match:
-        rssi = int(match.group(1))
-        ber = match.group(2)
-        dbm = -113 + 2 * rssi if rssi < 32 else "Unknown"
-        return rssi, ber, dbm
-    return None
+    lines = []
+    end_time = time.time() + 1.0  # 1초 내 응답 수신 제한
+    while time.time() < end_time:
+        line = ser.readline().decode(errors='ignore').strip()
+        if line:
+            lines.append(line)
+        if "OK" in line or "ERROR" in line:
+            break
+    return lines
 
-def parse_servingcell(response):
-    match = re.search(r'servingcell","(\w+)",\s*"LTE","\w+",(\d+),\s*(\d+),.*?,.*?,.*?,.*?,.*?,.*?,.*?,(-?\d+),(-?\d+)', response)
-    if match:
-        conn_state = match.group(1)
-        earfcn = match.group(2)
-        pci = match.group(3)
-        rsrp = match.group(4)
-        rsrq = match.group(5)
-        return conn_state, earfcn, pci, rsrp, rsrq
-    return None
-
-def log_signal_data(log_path, message):
-    with open(log_path, "a") as f:
-        f.write(message + "\n")
+def extract_rsrp_rsrq(qeng_lines):
+    for line in qeng_lines:
+        if "servingcell" in line and "LTE" in line:
+            match = re.search(r'servingcell",".*?","LTE",".*?",\d+,\d+,\d+.*?,.*?,.*?,.*?,.*?,.*?,.*?,(-?\d+),(-?\d+)', line)
+            if match:
+                rsrp = int(match.group(1))
+                rsrq = int(match.group(2))
+                return rsrp, rsrq
+    return None, None
 
 def main():
     try:
-        ser = serial.Serial(PORT, BAUDRATE, timeout=1)
-        print(f"[INFO] 포트 {PORT} 연결 성공")
-        print(f"[INFO] 로그 파일: {LOG_FILE}")
+        with serial.Serial(PORT, BAUDRATE, timeout=1) as ser:
+            print("[INFO] LTE 신호 측정 시작...")
+            for i in range(10):  # 10회 측정
+                lines = send_qeng_command(ser)
+                rsrp, rsrq = extract_rsrp_rsrq(lines)
+                if rsrp is not None:
+                    print(f"[#{i+1}] RSRP: {rsrp} dBm, RSRQ: {rsrq} dB")
+                else:
+                    print(f"[#{i+1}] 측정 실패")
+                time.sleep(1)  # 주기적으로 측정
+    except serial.SerialException as e:
+        print(f"[ERROR] 포트 연결 실패: {e}")
+    except KeyboardInterrupt:
+        print("[INFO] 사용자 중단")
 
-        while True:
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"\n[INFO] {timestamp} - 신호 정보 조회 중...")
+if __name__ == "__main__":
+    main()
 
-            log_entry = f"[{timestamp}]"
-
-            # RSSI
-            csq_resp = send_at_command(ser, "AT+CSQ")
-            csq_result = parse_csq(csq_resp)
-            if csq_result:
-                rssi, ber, dbm = csq_result
-                log_entry += f" RSSI: {rssi} ({dbm} dBm), BER: {ber}"
-            else:
-                rssi, ber, dbm = "N/A", "N/A", "N/A"
-                log_entry += " RSSI: N/A"
-
-            # RSRP, RSRQ
-            qeng_resp = send_at_command(ser, 'AT+QENG="servingcell"')
-            qeng_result = parse_servingcell(qeng_resp)
-            if qeng_result:
-                conn, earfcn, pci, rsrp, rsrq = qeng_result
-                log_entry += f", RSRP: {rsrp} dBm, RSRQ: {rsrq} dB"
-            else:
-                conn, earfcn, pci, rsrp, rsrq = "N/A", "N/A", "N/A", "N/A", "N/A"
-                log_entry += ", RSRP/RSRQ: N/A"
-
-            # 한 줄로 출력
-            print(f"  ▶ RSSI: {rssi} ({dbm} dBm), RSRP: {rsrp} dBm, RSRQ: {rsrq} dB")
-
-            # 로그 저장
-            log_signal_data(LOG_FILE, log_entry)
-            time.sleep(INTERVAL)
+     # 로그 저장
+    log_signal_data(LOG_FILE, log_entry)
+     time.sleep(INTERVAL)
 
     except serial.SerialException as e:
         print(f"[ERROR] 포트 연결 실패: {e}")
