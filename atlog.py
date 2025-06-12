@@ -58,10 +58,9 @@ def main():
             csq_result = parse_csq(csq_resp)
             if csq_result:
                 rssi, ber, dbm = csq_result
-                print(f"  ▶ RSSI: {rssi} → 약 {dbm} dBm, BER: {ber}")
                 log_entry += f" RSSI: {rssi} ({dbm} dBm), BER: {ber}"
             else:
-                print("  ▶ CSQ 정보 파싱 실패")
+                rssi, ber, dbm = "N/A", "N/A", "N/A"
                 log_entry += " RSSI: N/A"
 
             # RSRP, RSRQ
@@ -69,12 +68,13 @@ def main():
             qeng_result = parse_servingcell(qeng_resp)
             if qeng_result:
                 conn, earfcn, pci, rsrp, rsrq = qeng_result
-                print(f"  ▶ 연결 상태: {conn}, EARFCN: {earfcn}, PCI: {pci}")
-                print(f"  ▶ RSRP: {rsrp} dBm, RSRQ: {rsrq} dB")
                 log_entry += f", RSRP: {rsrp} dBm, RSRQ: {rsrq} dB, EARFCN: {earfcn}, PCI: {pci}"
             else:
-                print("  ▶ QENG 정보 파싱 실패")
+                conn, earfcn, pci, rsrp, rsrq = "N/A", "N/A", "N/A", "N/A", "N/A"
                 log_entry += ", RSRP/RSRQ: N/A"
+
+            # 한 줄로 출력
+            print(f"  ▶ RSSI: {rssi} ({dbm} dBm), RSRP: {rsrp} dBm, RSRQ: {rsrq} dB, EARFCN: {earfcn}, PCI: {pci}")
 
             # 로그 저장
             log_signal_data(LOG_FILE, log_entry)
