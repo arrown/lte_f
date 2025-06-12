@@ -10,25 +10,24 @@ v = "3mps"
 h = "50m"
 SERVER_URL = "ws://121.140.95.216:5000/ws/device1"
 
-# ===== 로그 파일 생성 (시간별 이름으로 덮어쓰기 방지) =====
 log_dir = "pingponglogs"
 os.makedirs(log_dir, exist_ok=True)
 LOG_FILE = os.path.join(log_dir, f"rtt_log_{v}_{h}.csv")
 
-# CSV 헤더 작성
-with open(LOG_FILE, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow([
-        "start_time(ms)",
-        "relay_time(ms)",
-        "pong_time(ms)",
-        "recv_time(ms)",
-        "one_way(ms)",
-        "rtt_reported(ms)",
-        "rtt_measured(ms)"
-    ])
+# CSV 헤더 작성 (처음 1회만)
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "start_time(ms)",
+            "relay_time(ms)",
+            "pong_time(ms)",
+            "recv_time(ms)",
+            "one_way(ms)",
+            "rtt_reported(ms)",
+            "rtt_measured(ms)"
+        ])
 
-# ===== 핑 루프 시작 =====
 async def ping_loop():
     try:
         print(f"🔌 Connecting to {SERVER_URL}...")
@@ -36,20 +35,18 @@ async def ping_loop():
             print("✅ Connected to server as device1")
 
             while True:
-                # Ping 메시지 생성
-                start_time = time.time() * 1000  # ms
-                ping_message = {
-                    "type": "ping",
-                    "start_time": start_time
-                }
-
-                await websocket.send(json.dumps(ping_message))
-                print(f"\n📤 Sent ping at {start_time:.2f} ms")
-
                 try:
-                    # Pong 수신 대기
+                    start_time = time.time() * 1000  # ms
+                    ping_message = {
+                        "type": "ping",
+                        "start_time": start_time
+                    }
+
+                    await websocket.send(json.dumps(ping_message))
+                    print(f"\n📤 Sent ping at {start_time:.2f} ms")
+
                     response = await asyncio.wait_for(websocket.recv(), timeout=5)
-                    recv_time = time.time() * 1000  # 수신 시각 기록
+                    recv_time = time.time() * 1000
                     msg = json.loads(response)
 
                     if msg.get("type") == "pong":
@@ -66,7 +63,6 @@ async def ping_loop():
                             print(f"   ▶ RTT reported by device2     : {rtt_reported:.2f} ms")
                             print(f"   ▶ RTT measured at device1     : {rtt_measured:.2f} ms")
 
-                            # 로그 저장
                             with open(LOG_FILE, "a", newline="") as f:
                                 writer = csv.writer(f)
                                 writer.writerow([
@@ -80,20 +76,23 @@ async def ping_loop():
                                 ])
                         else:
                             print("⚠️ Incomplete pong received.")
-
                     else:
                         print(f"⚠️ Unexpected message: {msg}")
 
                 except asyncio.TimeoutError:
                     print("⏰ Timeout: No pong received.")
                 except Exception as e:
-                    print(f"❌ Error processing pong: {e}")
+                    print(f"❌ Error in loop: {e}")
 
                 await asyncio.sleep(1)
 
+    except KeyboardInterrupt:
+        print("\n🛑 Stopped by user (KeyboardInterrupt)")
     except Exception as conn_err:
         print(f"❌ Connection error: {conn_err}")
+    finally:
+        print("📁 WebSocket session closed. Logs are preserved.")
 
-# ===== 실행 =====
 if __name__ == "__main__":
     asyncio.run(ping_loop())
+
