@@ -83,9 +83,13 @@ def main():
                 else:
                     log_line += " | RSRP/RSRQ: N/A"
 
-                # 출력 및 저장
                 print(log_line)
-                f.write(log_line + "\n")
+
+                # 💾 안전하게 매번 저장
+                with open(log_path, "a") as f:
+                    f.write(log_line + "\n")
+                    f.flush()  # flush는 OS 버퍼에 안 쌓이고 바로 기록되게 함
+
                 time.sleep(INTERVAL)
 
             print("[INFO] 측정 완료")
