@@ -10,12 +10,13 @@ INTERVAL = 1                # 측정 간격 (초)
 PORT = "/dev/ttyUSB2"
 BAUDRATE = 115200
 DELAY = 0.2                 # 명령 후 대기 시간
+v = "3mps"
+h = "50m"
 
 # === 로그 파일 설정 ===
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_path = os.path.join(log_dir, f"lte_log_{timestamp}.txt")
+log_path = os.path.join(log_dir, f"lte_log_{v}_{h}.txt")
 
 # AT 명령 송신 및 응답 수신
 def send_at_command(ser, command):
