@@ -68,13 +68,13 @@ def main():
             qeng_result = parse_servingcell(qeng_resp)
             if qeng_result:
                 conn, earfcn, pci, rsrp, rsrq = qeng_result
-                log_entry += f", RSRP: {rsrp} dBm, RSRQ: {rsrq} dB, EARFCN: {earfcn}, PCI: {pci}"
+                log_entry += f", RSRP: {rsrp} dBm, RSRQ: {rsrq} dB"
             else:
                 conn, earfcn, pci, rsrp, rsrq = "N/A", "N/A", "N/A", "N/A", "N/A"
                 log_entry += ", RSRP/RSRQ: N/A"
 
             # 한 줄로 출력
-            print(f"  ▶ RSSI: {rssi} ({dbm} dBm), RSRP: {rsrp} dBm, RSRQ: {rsrq} dB, EARFCN: {earfcn}, PCI: {pci}")
+            print(f"  ▶ RSSI: {rssi} ({dbm} dBm), RSRP: {rsrp} dBm, RSRQ: {rsrq} dB")
 
             # 로그 저장
             log_signal_data(LOG_FILE, log_entry)
