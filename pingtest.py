@@ -2,13 +2,16 @@ import subprocess
 import time
 import re
 import threading
+import os
 
 # 소티 구분 (속도, 고도 등)
 v = "3mps"
 h = "50m"
 
 # 로그 파일 이름 설정
-log_file = f"ping_{v}_{h}_log.txt"
+log_dir = "pinglogs"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, f"ping_{v}_{h}_log.txt")
 target_ip = "8.8.8.8"
 ping_cmd = ["ping", "-c", "1", target_ip]
 rtt_pattern = re.compile(r"time[=<]([\d.]+)\s*ms")
