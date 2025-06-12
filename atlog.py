@@ -1,24 +1,30 @@
 import serial
 import time
 import re
+import os
+from datetime import datetime
 
-# === 소티 조건 입력 (테스트별로 다르게 설정) ===
-v = "3mps"     # 속도
-h = "50m"      # 고도
-INTERVAL = 1  # 측정 주기 (초)
-
-# === 설정 ===
-PORT = "/dev/ttyUSB2"      
+# === 측정 설정 ===
+NUM_MEASUREMENTS = 20       # 측정 횟수
+INTERVAL = 1                # 측정 간격 (초)
+PORT = "/dev/ttyUSB2"
 BAUDRATE = 115200
-LOG_FILE = f"lte_log_{v}_{h}.txt"
+DELAY = 0.2                 # 명령 후 대기 시간
 
-def send_qeng_command(ser):
+# === 로그 파일 설정 ===
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_path = os.path.join(log_dir, f"lte_log_{timestamp}.txt")
+
+# AT 명령 송신 및 응답 수신
+def send_at_command(ser, command):
     ser.reset_input_buffer()
-    ser.write(b'AT+QENG="servingcell"\r')
+    ser.write((command + "\r").encode())
     time.sleep(DELAY)
 
     lines = []
-    end_time = time.time() + 1.0  # 1초 내 응답 수신 제한
+    end_time = time.time() + 1.0
     while time.time() < end_time:
         line = ser.readline().decode(errors='ignore').strip()
         if line:
@@ -27,47 +33,65 @@ def send_qeng_command(ser):
             break
     return lines
 
-def extract_rsrp_rsrq(qeng_lines):
-    for line in qeng_lines:
+# RSSI 파싱
+def parse_csq(lines):
+    for line in lines:
+        match = re.search(r'\+CSQ: (\d+),(\d+)', line)
+        if match:
+            rssi = int(match.group(1))
+            dbm = -113 + 2 * rssi if rssi < 32 else "Unknown"
+            return rssi, dbm
+    return None, None
+
+# RSRP/RSRQ 파싱
+def parse_qeng(lines):
+    for line in lines:
         if "servingcell" in line and "LTE" in line:
-            match = re.search(r'servingcell",".*?","LTE",".*?",\d+,\d+,\d+.*?,.*?,.*?,.*?,.*?,.*?,.*?,(-?\d+),(-?\d+)', line)
+            match = re.search(
+                r'servingcell",".*?","LTE","\w+",\d+,\d+,\d+.*?,.*?,.*?,.*?,.*?,.*?,.*?,(-?\d+),(-?\d+)',
+                line
+            )
             if match:
                 rsrp = int(match.group(1))
                 rsrq = int(match.group(2))
                 return rsrp, rsrq
     return None, None
 
+# 메인 실행
 def main():
     try:
-        with serial.Serial(PORT, BAUDRATE, timeout=1) as ser:
-            print("[INFO] LTE 신호 측정 시작...")
-            for i in range(10):  # 10회 측정
-                lines = send_qeng_command(ser)
-                rsrp, rsrq = extract_rsrp_rsrq(lines)
-                if rsrp is not None:
-                    print(f"[#{i+1}] RSRP: {rsrp} dBm, RSRQ: {rsrq} dB")
+        with serial.Serial(PORT, BAUDRATE, timeout=1) as ser, open(log_path, "a") as f:
+            print(f"[INFO] Logging to → {log_path}")
+            for i in range(NUM_MEASUREMENTS):
+                timestamp_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                log_line = f"[#{i+1}] {timestamp_str}"
+
+                # RSSI
+                csq_lines = send_at_command(ser, "AT+CSQ")
+                rssi, dbm = parse_csq(csq_lines)
+                if rssi is not None:
+                    log_line += f" | RSSI: {rssi} ({dbm} dBm)"
                 else:
-                    print(f"[#{i+1}] 측정 실패")
-                time.sleep(1)  # 주기적으로 측정
+                    log_line += " | RSSI: N/A"
+
+                # RSRP/RSRQ
+                qeng_lines = send_at_command(ser, 'AT+QENG="servingcell"')
+                rsrp, rsrq = parse_qeng(qeng_lines)
+                if rsrp is not None:
+                    log_line += f" | RSRP: {rsrp} dBm, RSRQ: {rsrq} dB"
+                else:
+                    log_line += " | RSRP/RSRQ: N/A"
+
+                # 출력 및 저장
+                print(log_line)
+                f.write(log_line + "\n")
+                time.sleep(INTERVAL)
+
+            print("[INFO] 측정 완료")
     except serial.SerialException as e:
         print(f"[ERROR] 포트 연결 실패: {e}")
     except KeyboardInterrupt:
         print("[INFO] 사용자 중단")
-
-if __name__ == "__main__":
-    main()
-
-     # 로그 저장
-    log_signal_data(LOG_FILE, log_entry)
-     time.sleep(INTERVAL)
-
-    except serial.SerialException as e:
-        print(f"[ERROR] 포트 연결 실패: {e}")
-    except KeyboardInterrupt:
-        print("\n[INFO] 종료됨.")
-    finally:
-        if 'ser' in locals() and ser.is_open:
-            ser.close()
 
 if __name__ == "__main__":
     main()
