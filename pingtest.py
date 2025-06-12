@@ -8,11 +8,9 @@ v = "3mps"
 h = "50m"
 
 # 로그 파일 이름 설정
-log_dir = "pinglogs"
-os.makedirs(log_dir, exist_ok=True)
-log_path = os.path.join(log_dir, f"ping_log_{v}_{h}.txt")
+log_file = f"ping_{v}_{h}_log.txt"
 target_ip = "8.8.8.8"
-ping_cmd = ["ping", "-c", "1", target]
+ping_cmd = ["ping", "-c", "1", target_ip]
 rtt_pattern = re.compile(r"time[=<]([\d.]+)\s*ms")
 
 # 루프 제어용 플래그
@@ -55,3 +53,4 @@ while True:
         thread.join()
         print("[INFO] Ping logging stopped by user.")
         break
+
