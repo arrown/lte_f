@@ -6,11 +6,14 @@ import csv
 import os
 from datetime import datetime
 
+v = "3mps"
+h = "50m"
 SERVER_URL = "ws://121.140.95.216:5000/ws/device1"
 
 # ===== 로그 파일 생성 (시간별 이름으로 덮어쓰기 방지) =====
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-LOG_FILE = f"rtt_log_{timestamp}.csv"
+log_dir = "pingponglogs"
+os.makedirs(log_dir, exist_ok=True)
+LOG_FILE = os.path.join(log_dir, f"rtt_log_{v}_{h}.csv")
 
 # CSV 헤더 작성
 with open(LOG_FILE, "w", newline="") as f:
