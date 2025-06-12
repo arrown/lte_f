@@ -14,7 +14,7 @@ v = "3mps"
 h = "50m"
 
 # === 로그 파일 설정 ===
-log_dir = "logs"
+log_dir = "atlogs"
 os.makedirs(log_dir, exist_ok=True)
 log_path = os.path.join(log_dir, f"lte_log_{v}_{h}.txt")
 
