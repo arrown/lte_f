@@ -47,17 +47,15 @@ def parse_csq(lines):
 # RSRP/RSRQ 파싱
 def parse_qeng(lines):
     for line in lines:
-        if "servingcell" in line and "LTE" in line:
-            match = re.search(
-                r'servingcell",".*?","LTE","\w+",\d+,\d+,\d+.*?,.*?,.*?,.*?,.*?,.*?,.*?,(-?\d+),(-?\d+)',
-                line
-            )
-            if match:
-                rsrp = int(match.group(1))
-                rsrq = int(match.group(2))
+        if '+QENG:' in line and 'LTE' in line:
+            parts = line.split(',')
+            try:
+                rsrp = int(parts[-9])
+                rsrq = int(parts[-8])
                 return rsrp, rsrq
+            except (ValueError, IndexError):
+                return None, None
     return None, None
-
 # 메인 실행
 def main():
     try:
